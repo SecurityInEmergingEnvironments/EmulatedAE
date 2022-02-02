@@ -1,0 +1,86 @@
+{
+  "mode": "Denoise",
+  "gpu": "1",
+  "img_size": 64,
+  "parentPath": "data_64_64",
+  "train": {
+    "trainingSet": "GTSRB",
+    "namesOfModels": ["EfficientNetB0", "ResNet50", "VGG19"],
+    "freezeEpochs": 2,
+    "unfreezeEpochs": 3,
+    "trainingVerbose": true,
+    "numberOfModels": [0,1,2,3,4],
+    "savedModelPath":"data_64_64/GTSRB/GTSRB_models",
+    "bestParamsJSONPath":"data_64_64/GTSRB/best_params",
+    "dataAugmentation":{
+      "channel_shift_range": 10.0,
+      "height_shift_range": 0.1,
+      "shear_range": 0.1,
+      "width_shift_range": 0.1,
+      "zoom_range": 0.1,
+      "rotation_range": 20
+    },
+    "kFold_n_splits": 5
+  },
+  "attack":{
+    "averageMode": "macro",
+    "numberOfAdvExamples":6000,
+    "pathToCreate":"data_64_64/GTSRB/attacks/{nameOfModel}/model_{numberOfModel}",
+    "advPredPath":"data_64_64/GTSRB/attacks/{nameOfModel}/model_{numberOfModel}/{savedFilePath}",
+    "advExamplesDSPath":"data_64_64/GTSRB/attacks/{nameOfModel}/model_{numberOfModel}/{dsSavedFilePath}",
+    "advExamplesNoiseDSPath":"data_64_64/GTSRB/attacks/{nameOfModel}/model_{numberOfModel}/{noiseDsSavedFilePath}",
+    "attackers": [
+      {
+        "attackerName": "PGD",
+        "params":{
+          "batch_size": 20,
+          "max_iter": 150,
+          "eps": 2.5,
+          "num_random_init": 3
+        },
+        "savedFilePath":"(PGD)_(max_iter-150_eps-250e-2_num_random_init-3).npz",
+        "dsSavedFilePath":"(PGD)_(max_iter-150_eps-250e-2_num_random_init-3)_ds",
+        "noiseDsSavedFilePath":"(PGD)_(max_iter-150_eps-250e-2_num_random_init-3)_noise_ds"
+      },
+      {
+        "attackerName": "deepFool",
+        "params":{
+          "batch_size": 20,
+          "max_iter": 40,
+          "epsilon": 4e-4
+        },
+        "savedFilePath":"(deepFool)_(max_iter-40_epsilon-4e-4).npz",
+        "dsSavedFilePath":"(deepFool)_(max_iter-40_epsilon-4e-4)_ds",
+        "noiseDsSavedFilePath":"(deepFool)_(max_iter-40_epsilon-4e-4)_noise_ds"
+      },
+      {
+        "attackerName": "FGSM",
+        "params":{
+          "batch_size": 20,
+          "eps": 5.0,
+          "num_random_init": 3,
+          "minimal": true
+        },
+        "savedFilePath":"(FGSM)_(eps-50e-1_num_random_init-3_minimal-true).npz",
+        "dsSavedFilePath":"(FGSM)_(eps-50e-1_num_random_init-3_minimal-true)_ds",
+        "noiseDsSavedFilePath":"(FGSM)_(eps-50e-1_num_random_init-3_minimal-true)_noise_ds"
+      }
+    ]
+  },
+  "denoisers":{
+    "resolution": [64, 64, 3],
+    "numberOfTargetModels": [0],
+    "denoiserNames":["emulated-ae"],
+    "noiseLevels":[3e-2, 0, 1e-3],
+    "mode": "individual",
+    "savedDenoiserPath":"data_64_64/denoisers/GTSRB/noiseLevel_{noiseLevel}/{denoiserName}",
+    "bestDenoiserGivenAllNoiseLevels":"data_64_64/denoisers/GTSRB",
+    "e-ae":{
+      "EAE_intermediary_sizes":[16, 20, 24, 28, 30, 32, 40],
+      "evaluationReportPath":"data_64_64/denoisers/GTSRB/emulated-ae"
+    }
+  },
+  "result": {
+    "savedJSONPath": "data_64_64/GTSRB/classifierBaseLineReports/report.json"
+  }
+}

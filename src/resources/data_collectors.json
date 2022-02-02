@@ -1,0 +1,46 @@
+{
+  "gpu": "-1",
+  "collectors":[
+    {
+      "img_size": 224,
+      "typeOfCollector":"denoisers",
+      "dataset_name": "cifar100",
+      "pathFormat":"data_224_224/denoisers/{dataset_name}/{best_eval_json_report}",
+      "numOfModels":[0,1,2,3,4],
+      "nameOfModels": ["EfficientNetB0","ResNet50","VGG19"],
+      "keyFormat": "{nameOfModel}_{numOfModel}",
+      "setting": "grey-box_setting",
+      "attackerNames": ["PGD", "FGSM", "deepFool"],
+      "denoiserNames": ["emulated-ae", "ae", "unet", "vae", "jpegCompression"],
+      "bestEvalJsonReportsFormat": "best_{denoiserName}_Denoiser_report.json",
+      "mergedJsonFilePathFormat": "data_224_224/denoisers/{dataset_name}/all_eval_json_report.json",
+      "csvFilePath": "data_224_224/denoisers/{dataset_name}/all_eval_json_report.csv"
+    },
+    {
+      "img_size": 224,
+      "typeOfCollector":"baseline_classifier_Benign_Performance",
+      "dataset_names": ["GTSRB"],
+      "nameOfModels": ["ResNet50"],
+      "numOfModels": 5,
+      "inputModelPath": "data/{dataset_name}/{dataset_name}_models/{nameOfModel}_num_{numOfModel}",
+      "y_pred_path": "data/{dataset_name}/{dataset_name}_models/{nameOfModel}_num_{numOfModel}/y_pred.npz",
+      "resultPath": "data/{dataset_name}/baseline_classifier_benign_performance_collectorResult.json"
+    },
+    {
+      "img_size": 224,
+      "typeOfCollector":"baseline_classifier_Adversarial_Performance",
+      "inputModelPath": "data/{dataset_name}/{dataset_name}_models/{nameOfModel}_num_{numOfModel}",
+      "y_pred_path": "data/{dataset_name}/{dataset_name}_models/{nameOfModel}_num_{numOfModel}/y_pred.npz",
+      "dataset_names": ["GTSRB"],
+      "nameOfModels": ["EfficientNetB0", "ResNet50", "VGG19"],
+      "numOfModels": 5,
+      "attackerSavedFilePaths":[
+        "(deepFool)_(max_iter-40_epsilon-5e-1).npz"
+      ],
+      "data_path": "data/{dataset_name}/attacks/{nameOfModel}/model_{numOfModel}/{attackerSavedFilePath}",
+      "csvFilePath": "data/{dataset_name}/reports/{nameOfModel}",
+      "csvFileName": "{csvFilePath}/baseline_classifier_adversarial_performance_collectorResult.csv",
+      "resultPath": "data/{dataset_name}/baseline_classifier_adversarial_performance_collectorResult.json"
+    }
+  ]
+}

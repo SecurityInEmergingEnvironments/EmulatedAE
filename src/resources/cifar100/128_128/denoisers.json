@@ -1,0 +1,86 @@
+{
+  "mode": "Denoise",
+  "gpu": "3",
+  "img_size": 128,
+  "parentPath": "data_128_128",
+  "train": {
+    "trainingSet": "cifar100",
+    "namesOfModels": ["EfficientNetB0", "ResNet50", "VGG19"],
+    "freezeEpochs": 5,
+    "unfreezeEpochs": 10,
+    "trainingVerbose": true,
+    "numberOfModels": [0,1,2,3,4],
+    "savedModelPath":"data_128_128/cifar100/cifar100_models",
+    "bestParamsJSONPath":"data_128_128/cifar100/best_params",
+    "dataAugmentation":{
+      "channel_shift_range": 10.0,
+      "height_shift_range": 0.1,
+      "shear_range": 0.1,
+      "width_shift_range": 0.1,
+      "zoom_range": 0.1,
+      "rotation_range": 20
+    },
+    "kFold_n_splits": 5
+  },
+  "attack":{
+    "averageMode":"macro",
+    "numberOfAdvExamples":6000,
+    "pathToCreate":"data_128_128/cifar100/attacks/{nameOfModel}/model_{numberOfModel}",
+    "advPredPath":"data_128_128/cifar100/attacks/{nameOfModel}/model_{numberOfModel}/{savedFilePath}",
+    "advExamplesDSPath":"data_128_128/cifar100/attacks/{nameOfModel}/model_{numberOfModel}/{dsSavedFilePath}",
+    "advExamplesNoiseDSPath":"data_128_128/cifar100/attacks/{nameOfModel}/model_{numberOfModel}/{noiseDsSavedFilePath}",
+    "attackers": [
+      {
+        "attackerName": "PGD",
+        "params":{
+          "batch_size": 20,
+          "max_iter": 150,
+          "eps": 0.85,
+          "num_random_init": 3
+        },
+        "savedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3).npz",
+        "dsSavedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3)_ds",
+        "noiseDsSavedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3)_noise_ds"
+      },
+      {
+        "attackerName": "deepFool",
+        "params":{
+          "batch_size": 20,
+          "max_iter": 50,
+          "epsilon": 1e-2
+        },
+        "savedFilePath":"(deepFool)_(max_iter-50_epsilon-1e-2).npz",
+        "dsSavedFilePath":"(deepFool)_(max_iter-50_epsilon-1e-2)_ds",
+        "noiseDsSavedFilePath":"(deepFool)_(max_iter-50_epsilon-1e-2)_noise_ds"
+      },
+      {
+        "attackerName": "FGSM",
+        "params":{
+          "batch_size": 20,
+          "eps": 0.9,
+          "num_random_init": 3,
+          "minimal": true
+        },
+        "savedFilePath":"(FGSM)_(eps-9e-1_num_random_init-3_minimal-true).npz",
+        "dsSavedFilePath":"(FGSM)_(eps-9e-1_num_random_init-3_minimal-true)_ds",
+        "noiseDsSavedFilePath":"(FGSM)_(eps-9e-1_num_random_init-3_minimal-true)_noise_ds"
+      }
+    ]
+  },
+  "denoisers":{
+    "resolution": [128, 128, 3],
+    "numberOfTargetModels": [0],
+    "denoiserNames":["emulated-ae"],
+    "noiseLevels":[3e-2, 0, 1e-3],
+    "mode": "individual",
+    "savedDenoiserPath":"data_128_128/denoisers/cifar100/noiseLevel_{noiseLevel}/{denoiserName}",
+    "bestDenoiserGivenAllNoiseLevels":"data_128_128/denoisers/cifar100",
+    "e-ae":{
+      "EAE_intermediary_sizes": [16, 20, 24, 28, 30, 32, 40, 64],
+      "evaluationReportPath":"data_128_128/denoisers/cifar100/emulated-ae"
+    }
+  },
+  "result": {
+    "savedJSONPath": "data_128_128/cifar100/classifierBaseLineReports/report.json"
+  }
+}
