@@ -37,7 +37,7 @@ class ParamsRangeForNNDenoisers:
     self.resolution = resolution
   
   def getParams(self):
-    if self.resolution == [224, 224, 3]:
+    if self.resolution == [224, 224, 3] or self.resolution == [32, 32, 3]:
       return self._getParamsForRegularResolution()
     else:
       raise Exception("resolution {} not supported yet by ParamsRangeForNNDenoisers".format(self.resolution))
@@ -56,7 +56,7 @@ class ParamsRangeForNNDenoisers:
       paramGrid = {
         "latent_dim": [1024],
         "optimizer":['adam'],
-        "optimizerLR": [1e-5, 1e-4, 1e-3]
+        "optimizerLR": [1e-5, 1e-4, 1e-6]
       }
     elif self.name == "unet":
       paramGrid = {
