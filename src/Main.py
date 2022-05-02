@@ -2,6 +2,9 @@ import sys
 from ConfigParser import ConfigParser
 from DataLoader import DataLoader
 from Denoiser import Denoiser
+import logging
+logger = logging.getLogger()
+logger.disabled = True
 
 import os
 import tensorflow as tf
