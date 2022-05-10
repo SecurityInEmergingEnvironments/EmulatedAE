@@ -4,15 +4,14 @@ CIFAR10_LABEL_TYPE = 'label'
 TMP_NAME = "/tmp_"
 GTSRB_RAW_DATA_PATH = "data_224_224/datasets/GTSRB_raw_data/"
 MIN_VAL_LOSS_CONSTANT = 9999999
-# IMG_SIZE = 224
 CIFAR100_ORIGINAL_SIZE = 32
 VAE_DEFAULT_INPUT_SHAPE = 32
-ALL_NN_DENOISER_NAMES = ['ae', 'vae', 'unet']
-ALL_REGULAR_DENOISER_NAMES = ['emulated-ae', 'jpegCompression', 'non-local', 'tv', 'noise2self']
+ALL_NN_DENOISER_NAMES = ['ae', 'vae', 'unet', 'Chained_Vae_EAE', 'Chained_EAE_Vae']
+ALL_REGULAR_DENOISER_NAMES = ['emulated-ae', 'jpegCompression', 'non-local', 'tv', 'noise2self', 'eae_jpeg', 'jpeg_eae']
 BATCH_SIZE = 20
 
 AE_REGULAR_TRAINING_EPOCHS = 5
-VAE_REGULAR_TRAINING_EPOCHS = 300
+VAE_REGULAR_TRAINING_EPOCHS = 200
 UNET_REGULAR_TRAINING_EPOCHS = 1
 
 DEFENDER_NAME = "defenders"
