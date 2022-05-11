@@ -20,7 +20,7 @@ from tensorflow.keras.losses import mean_squared_error
 
 from DataLoader import DataLoader
 from Utils import substituteString
-from Constants import BATCH_SIZE, ALL_NN_DENOISER_NAMES, ALL_REGULAR_DENOISER_NAMES, AE_REGULAR_TRAINING_EPOCHS, UNET_REGULAR_TRAINING_EPOCHS, VAE_DEFAULT_INPUT_SHAPE, VAE_REGULAR_TRAINING_EPOCHS
+from Constants import BATCH_SIZE, ALL_NN_DENOISER_NAMES, ALL_REGULAR_DENOISER_NAMES, VAE_DEFAULT_INPUT_SHAPE, VAE_REGULAR_TRAINING_EPOCHS
 from ParamsRange import ParamsRangeForNNDenoisers
 from TraditionalImageDenoiser import TraditionalImageDenoiser
 
@@ -920,7 +920,7 @@ class Unet:
     start = time.time()
     history = denoiser.fit(
         ds_train,
-        epochs = UNET_REGULAR_TRAINING_EPOCHS,
+        epochs = 1,
         batch_size = 1,
         shuffle = True,
         validation_data = (ds_test),
@@ -1056,7 +1056,7 @@ class AutoEncoder:
     start = time.time()
     history = denoiser.fit(
         ds_train,
-        epochs = AE_REGULAR_TRAINING_EPOCHS,
+        epochs = 5,
         batch_size = 1,
         shuffle = True,
         validation_data = (ds_test),

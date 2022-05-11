@@ -10,9 +10,7 @@ ALL_NN_DENOISER_NAMES = ['ae', 'vae', 'unet', 'Chained_Vae_EAE', 'Chained_EAE_Va
 ALL_REGULAR_DENOISER_NAMES = ['emulated-ae', 'jpegCompression', 'non-local', 'tv', 'noise2self', 'eae_jpeg', 'jpeg_eae']
 BATCH_SIZE = 20
 
-AE_REGULAR_TRAINING_EPOCHS = 5
 VAE_REGULAR_TRAINING_EPOCHS = 200
-UNET_REGULAR_TRAINING_EPOCHS = 1
 
 DEFENDER_NAME = "defenders"
 BASELINE_PERFORMANCE = "baseline_performance"
