@@ -15,7 +15,11 @@ from art.attacks.evasion.deepfool import DeepFool
 from art.attacks.evasion.fast_gradient import FastGradientMethod
 from art.attacks.evasion.universal_perturbation import UniversalPerturbation
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-
+import logging.config
+logging.config.dictConfig({
+  'version':1,
+  'disable_existing_loggers': True
+})
 from DataLoader import DataLoader
 from Utils import substituteString, generateSamples
 from ReportGenerator import ClassifierBaseAttackReport
