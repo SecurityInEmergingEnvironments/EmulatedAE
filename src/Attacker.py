@@ -10,7 +10,7 @@ import shutil
 
 from art.attacks.evasion.projected_gradient_descent.projected_gradient_descent import ProjectedGradientDescent
 from art.estimators.classification import TensorFlowV2Classifier
-from art.attacks.evasion.elastic_net import ElasticNet
+from art.attacks.evasion.carlini import CarliniL2Method
 from art.attacks.evasion.deepfool import DeepFool
 from art.attacks.evasion.fast_gradient import FastGradientMethod
 from art.attacks.evasion.universal_perturbation import UniversalPerturbation
@@ -26,7 +26,9 @@ from ReportGenerator import ClassifierBaseAttackReport
 from Constants import BATCH_SIZE, TMP_NAME
 from ParamsRange import ParamsRangeRetriever
 
-from PreprocessingDenoiser import EAE, MyJpegCompression
+from PreprocessingDenoiser import EAE, AE, UNET, VAE, VAE_BPDA, EAE_VAE, VAE_EAE
+from PreprocessingDenoiser import MyJpegCompression, EAE_jpegCompression, JpegCompression_EAE
+from PreprocessingDenoiser import EAE_jpegCompression_BPDA, VAE_EAE_BPDA
 
 """
 This componenet is to attack trained baseline classifiers
@@ -34,9 +36,6 @@ This componenet is to attack trained baseline classifiers
 class Attacker:
   def __init__(self, kwargs):
     self.kwargs = kwargs
-    # self.advPredPath = kwargs['attack']['advPredPath']
-    # self.advExamplesDSPath = kwargs['attack']['advExamplesDSPath']
-    # self.advExamplesNoiseDSPath = kwargs['attack']['advExamplesNoiseDSPath']
     self.numberOfAdvExamples = kwargs['attack']['numberOfAdvExamples']
     self.averageMode = kwargs['attack']['averageMode']
     self.attackers = kwargs['attack']['attackers']
@@ -59,10 +58,49 @@ class Attacker:
     for preprocessorName in preprocessorObj['preprocessor_pipeline']:
       if preprocessorName == 'E-AE':
         preprocessorPipeline.append(EAE(preprocessorObj['params']))
+      elif preprocessorName == 'AE':
+        preprocessorPipeline.append(AE(preprocessorObj['params']))
+      elif preprocessorName == 'UNET':
+        preprocessorPipeline.append(UNET(preprocessorObj['params']))
+      elif preprocessorName == 'VAE':
+        preprocessorPipeline.append(VAE(preprocessorObj['params']))
+      elif preprocessorName == 'VAE_BPDA':
+        preprocessorPipeline.append(VAE_BPDA(preprocessorObj['params']))
+      elif preprocessorName == 'EAE_jpegCompression_BPDA':
+        preprocessorPipeline.append(EAE_jpegCompression_BPDA(preprocessorObj['params']))
+      elif preprocessorName == 'VAE_EAE_BPDA':
+        preprocessorPipeline.append(VAE_EAE_BPDA(preprocessorObj['params']))
+      elif preprocessorName == 'EAE_VAE':
+        preprocessorPipeline.append(EAE_VAE(preprocessorObj['params']))
+      elif preprocessorName == 'VAE_EAE':
+        preprocessorPipeline.append(VAE_EAE(preprocessorObj['params']))
+      elif preprocessorName == 'jpegCompression':
+        preprocessorPipeline.append(MyJpegCompression(quality = preprocessorObj['params']['jpeg']['quality']))
+      elif preprocessorName == 'EAE_jpegCompression':
+        preprocessorPipeline.append(EAE_jpegCompression(preprocessorObj['params']))
+      elif preprocessorName == 'JpegCompression_EAE':
+        preprocessorPipeline.append(JpegCompression_EAE(preprocessorObj['params']))
       else:
         raise Exception("{} preprocessor is not supported yet".format(preprocessorName))
     
     return preprocessorPipeline
+
+  def _modifyModel(self, model):
+    # https://stackoverflow.com/a/58547262
+    assert model.layers[-1].activation == tf.keras.activations.softmax
+
+    config = model.layers[-1].get_config()
+    weights = [x.numpy() for x in model.layers[-1].weights]
+
+    config['activation'] = tf.keras.activations.linear
+    config['name'] = 'logits'
+
+    new_layer = tf.keras.layers.Dense(**config)(model.layers[-2].output)
+    new_model = tf.keras.Model(inputs=[model.input], outputs=[new_layer])
+    new_model.layers[-1].set_weights(weights)
+
+    assert new_model.layers[-1].activation == tf.keras.activations.linear
+    return new_model
 
   def runAttack(self): # main public method
     # load the test data
@@ -109,9 +147,11 @@ class Attacker:
             # get the models
             Path(advExamplesNoiseDSPath).mkdir(parents=True, exist_ok=True)
             targetModel, targetClassifier = None, None
-            # if len(os.listdir(advExamplesDSPath)) == 0 or len(os.listdir(advExamplesNoiseDSPath)) == 0 or not os.path.exists(advPredSavedPath):
             if len(os.listdir(advExamplesNoiseDSPath)) == 0 or not os.path.exists(advPredSavedPath):
               targetModel = self._getModel(currentModelNum = numOfModel, nameOfModel = nameOfModel, parentPath = self.kwargs['parentPath'])
+              if 'logit' in attack and attack['logit']:
+                print("[DEBUG] get logits")
+                targetModel = self._modifyModel(model = targetModel)
               _, classes, _ = ParamsRangeRetriever(self.dataset_name).getParams()
               targetClassifier = self._getClassifier(model = targetModel, classes = classes, preprocessing_defences = preprocessing_defences)
             # extract images and labels from test data
@@ -121,6 +161,7 @@ class Attacker:
             y_true = np.argmax(y_true,axis=1)[0:self.numberOfAdvExamples]# TODO: DEBUG
 
             l2_distances, l_inf_distances, fooling_rates = [],[],[]
+            normalized_l2_distances, normalized_l_inf_distances = [],[]
             if len(os.listdir(advExamplesNoiseDSPath)) == 0:
               print(advExamplesNoiseDSPath+" not exist yet. Creating one...")
               # get the attacker
@@ -171,8 +212,12 @@ class Attacker:
                 adv_y_preds = np.concatenate((adv_y_preds, adv_y_pred), axis = 0)
                 
                 adv_noises = x_test_adv - x_copy
-                l2_distances.append(np.linalg.norm(adv_noises))
-                l_inf_distances.append(np.linalg.norm(adv_noises.ravel(),ord = np.inf))
+                l2_distances.append(np.linalg.norm(adv_noises)) # working
+                l_inf_distances.append(np.linalg.norm(adv_noises.ravel(),ord = np.inf)) # working
+                
+                normalized_noises = (x_test_adv / 255.0) - (x_copy / 255.0)
+                normalized_l2_distances.append(np.linalg.norm(normalized_noises))
+                normalized_l_inf_distances.append(np.linalg.norm(normalized_noises.ravel(),ord = np.inf))
 
                 if adv_noises_list is None:
                   adv_noises_list = np.array(adv_noises)
@@ -218,6 +263,8 @@ class Attacker:
                 adv_f1_score = adv_f1_score,
                 l2_distances = l2_distances,
                 l_inf_distances = l_inf_distances,
+                normalized_l2_distances = normalized_l2_distances,
+                normalized_l_inf_distances = normalized_l_inf_distances,
                 averageMode = self.averageMode,
                 numberOfAdvExamples = self.numberOfAdvExamples
               )
@@ -240,14 +287,7 @@ class Attacker:
               del noise_ds_adv
               del adv_noises_list
               gc.collect()
-            # elif len(os.listdir(advExamplesNoiseDSPath)) == 0:
-            #   print("working on {}".format(advExamplesNoiseDSPath))
-            #   l2_distances, l_inf_distances = self._saveAdvNoise(
-            #     # advExamplesDSPath = advExamplesDSPath,
-            #     advExamplesNoiseDSPath = advExamplesNoiseDSPath,
-            #     ds_test = ds_test,
-            #     length = y_true.shape[0]
-            #     )
+
             elif len(os.listdir(advExamplesNoiseDSPath)) > 0:
               print("{} already exists".format(advExamplesNoiseDSPath))
 
@@ -262,35 +302,6 @@ class Attacker:
               l_inf_distances = l_inf_distances
               )
 
-            # # re-create ds-adv
-            # if len(os.listdir(advExamplesDSPath)) == 0:
-            #   noise_ds_adv = tf.data.experimental.load(advExamplesNoiseDSPath, element_spec=(tf.TensorSpec(shape=(self.kwargs['img_size'], self.kwargs['img_size'], 3), dtype=tf.float32, name=None)), compression='GZIP')
-            #   noise_ds_adv = noise_ds_adv.batch(batch_size=BATCH_SIZE, drop_remainder=True)
-            #   print("re-creating {}".format(advExamplesDSPath))
-            #   all_x_test_adv = None
-            #   i = 0
-            #   progress_bar_test = tf.keras.utils.Progbar(self.numberOfAdvExamples)
-            #   for noise in noise_ds_adv: # each batch are 20 images (default)
-            #     # re-create adv. examples
-            #     skip = i
-            #     benign_examples = np.concatenate([np.copy(x.numpy()) for x,y in ds_test.skip(skip).take(1)], axis=0)
-            #     x_test_adv = (benign_examples + noise)
-            #     if all_x_test_adv is None:
-            #       all_x_test_adv = np.array(x_test_adv)
-            #     else:
-            #       all_x_test_adv = np.concatenate((all_x_test_adv, x_test_adv), axis = 0)
-            #     i+=1
-            #     progress_bar_test.add(noise.shape[0])
-            #   ds_adv = tf.data.Dataset.from_tensor_slices((all_x_test_adv))
-            #   tf.data.experimental.save(ds_adv, advExamplesDSPath)
-            #   print("[success] saved to {}".format(advExamplesDSPath))
-            #   del ds_adv
-            #   gc.collect()
-            #   del all_x_test_adv
-            #   gc.collect()
-            # else:
-            #   print("{} already exist!".format(advExamplesDSPath))
-
             if targetModel is not None:
               del targetModel
               gc.collect()
@@ -302,6 +313,8 @@ class Attacker:
               mean_l_inf_distances = statistics.mean(l_inf_distances)
               print("l2_distances: "+str(mean_l2_distances))
               print("l_inf_distances: "+str(mean_l_inf_distances))
+              print("normalized_l2_distances: "+str(np.mean(normalized_l2_distances)))
+              print("normalized_l_inf_distances: "+str(np.mean(normalized_l_inf_distances)))
     del ds_test
     gc.collect()
   def _saveAdvNoise(self, advExamplesDSPath, advExamplesNoiseDSPath, length, ds_test):
@@ -384,7 +397,6 @@ class Attacker:
   def _loadCkpt(self, loadPath, noiseDsSavedFilePath, benign_y_preds, adv_noises_list = None, adv_y_preds = np.array([])):
     if len(os.listdir(loadPath)) > 0:
       for count in range (len(os.listdir(loadPath))):
-        # currentFilePath = loadPath + "/" + nameOfModel+"_model_0_attack_{}.npz".format(count)
         currentFilePath = loadPath + "/{}_ckpt_{}.npz".format(noiseDsSavedFilePath, count)
         try:
           ckpt = np.load(currentFilePath)
@@ -406,25 +418,6 @@ class Attacker:
           else:
             print("{} file cannot be removed".format(currentFilePath))  
     return adv_noises_list, adv_y_preds, benign_y_preds
-    # # noise ds should be available by this line
-    # if (False): # sanity check
-    #   noise_ds = tf.data.experimental.load(advExamplesNoiseDSPath, element_spec=(tf.TensorSpec(shape=(self.kwargs['img_size'], self.kwargs['img_size'], 3), dtype=tf.float32, name=None)), compression='GZIP')
-    #   noise_ds = noise_ds.batch(batch_size=BATCH_SIZE, drop_remainder=True)
-    #   i = 0
-    #   progress_bar_test = tf.keras.utils.Progbar(y_true.shape[0]) #TODO: DEBUG
-    #   adv_y_preds = np.array([])
-    #   for noise in noise_ds:
-    #     skip = i
-    #     benign_examples = np.concatenate([x for x, y in ds_test.skip(skip).take(1)], axis=0)
-    #     adv_examples = benign_examples + noise
-
-    #     adv_y_preds = np.concatenate((adv_y_preds, np.argmax(targetModel.predict(adv_examples),axis=1)), axis = 0)
-    #     i+=1
-    #     progress_bar_test.add(benign_examples.shape[0])
-
-    #   new_denoised_adv_acc = 100 * accuracy_score(y_true, adv_y_preds)
-    #   print("[Noise reconstruction] adv_acc: " + str(new_denoised_adv_acc))
-
 
   def _getModel(self, parentPath, currentModelNum = None, nameOfModel = None):
     model = None
@@ -435,14 +428,25 @@ class Attacker:
 
   def _getAttack(self, attackerName, classifier, params):
     if attackerName == "PGD":
-      return ProjectedGradientDescent(
-        estimator = classifier,
-        batch_size = params['batch_size'],
-        eps = params['eps'],
-        max_iter = params['max_iter'],
-        num_random_init = params['num_random_init'],
-        verbose=False
-      )
+      if 'eps_step' in params:
+        return ProjectedGradientDescent(
+          estimator = classifier,
+          batch_size = params['batch_size'],
+          eps = params['eps'],
+          max_iter = params['max_iter'],
+          num_random_init = params['num_random_init'],
+          eps_step=params['eps_step'],
+          verbose=False
+        )
+      else:
+        return ProjectedGradientDescent(
+          estimator = classifier,
+          batch_size = params['batch_size'],
+          eps = params['eps'],
+          max_iter = params['max_iter'],
+          num_random_init = params['num_random_init'],
+          verbose=False
+        )
     
     elif attackerName == "deepFool":
       return DeepFool(
@@ -484,6 +488,6 @@ class Attacker:
       train_step = train_step,
       nb_classes = classes,
       preprocessing_defences = preprocessing_defences,
-      input_shape = (self.kwargs['img_size'], self.kwargs['img_size'], 3),
+      input_shape = (self.kwargs['img_size'], self.kwargs['img_size'], 3)
     )
     return tf2_classifier
