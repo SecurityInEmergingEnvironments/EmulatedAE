@@ -54,7 +54,6 @@ class DataLoader:
       NUM_CLASSES = ds_info.features[label_type].num_classes
       size = (img_size, img_size)
       if (ds_train is not None):
-        # why bilinear? Recommended as it is reasonably good-quality, faster than Lanczos3Kernel, which high-quality, particularly in upsampling
         # source:https://www.tensorflow.org/api_docs/python/tf/image/resize
         if img_size == CIFAR100_ORIGINAL_SIZE:
           ds_train = ds_train.map(lambda dictionary: (dictionary['image'], dictionary[label_type]))
