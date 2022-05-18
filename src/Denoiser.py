@@ -20,7 +20,7 @@ from tensorflow.keras.losses import mean_squared_error
 
 from DataLoader import DataLoader
 from Utils import substituteString
-from Constants import BATCH_SIZE, ALL_NN_DENOISER_NAMES, ALL_REGULAR_DENOISER_NAMES, VAE_DEFAULT_INPUT_SHAPE, VAE_REGULAR_TRAINING_EPOCHS
+from Constants import BATCH_SIZE, ALL_NN_DENOISER_NAMES, ALL_REGULAR_DENOISER_NAMES, AE_REGULAR_TRAINING_EPOCHS, UNET_REGULAR_TRAINING_EPOCHS, VAE_DEFAULT_INPUT_SHAPE, VAE_REGULAR_TRAINING_EPOCHS
 from ParamsRange import ParamsRangeForNNDenoisers
 from TraditionalImageDenoiser import TraditionalImageDenoiser
 
@@ -76,27 +76,13 @@ class Denoiser:
             "noiseDsSavedFilePath": noiseDsSavedFilePath
           }
           my_dict['pathToCreate'] = substituteString(my_dict = my_dict, formatStr = preprocessorObj['pathToCreate'])
-          # advPredPath = substituteString(
-          #   my_dict = my_dict,
-          #   formatStr = self.kwargs['attack']['advPredPath']
-          # )
-          # advExamplesDSPath = substituteString(
-          #   my_dict = my_dict,
-          #   formatStr = self.kwargs['attack']['advExamplesDSPath']
-          # )
-          # advExamplesNoiseDSPath = substituteString(
-          #   my_dict = my_dict,
-          #   formatStr = self.kwargs['attack']['advExamplesNoiseDSPath']
-          # )
+          
           _, advExamplesNoiseDSPath = self._getAdvPredSavedPathAndAdvExamplesNoiseDSPath(
               my_dict = my_dict,
               preprocessorObj = preprocessorObj
             )
           # load adv. examples / adv. noise
-          # ds_adv, noise_ds_adv = None, None
           noise_ds_adv = None
-          # if os.path.isdir(advExamplesDSPath) and len(os.listdir(advExamplesDSPath)) > 0:
-          #   ds_adv = tf.data.experimental.load(advExamplesDSPath, element_spec=(tf.TensorSpec(shape=(self.kwargs['img_size'], self.kwargs['img_size'], 3), dtype=tf.float32, name=None)))
           
           if os.path.isdir(advExamplesNoiseDSPath) and len(os.listdir(advExamplesNoiseDSPath)) > 0:
             noise_ds_adv = tf.data.experimental.load(advExamplesNoiseDSPath, element_spec=(tf.TensorSpec(shape=(self.kwargs['img_size'], self.kwargs['img_size'], 3), dtype=tf.float32, name=None)), compression='GZIP')
@@ -166,7 +152,7 @@ class Denoiser:
         )
         # step 2: train the denoiser
         
-        current_denoiser_eval_score_given_noiseLevel, current_eval_result, curr_denoiser = denoiser.train(ds_train = ds_train, ds_test = ds_test, resolution = self.denoiserKwargs['resolution'])
+        current_denoiser_eval_score_given_noiseLevel, current_eval_result, curr_denoiser_saved_path = denoiser.train(ds_train = ds_train, ds_test = ds_test, resolution = self.denoiserKwargs['resolution'])
         if current_denoiser_eval_score_given_noiseLevel > best_denoiser_eval_score_all_noiseLevel:
           best_denoiser_eval_score_all_noiseLevel = current_denoiser_eval_score_given_noiseLevel
           best_eval_result = current_eval_result
@@ -176,7 +162,7 @@ class Denoiser:
             param['noise_level'] = noiseLevel
           best_eval_result['best_denoiser_eval_score_all_noiseLevel'] = best_denoiser_eval_score_all_noiseLevel
           best_denoisers[denoiserName] = {
-            "denoiser": curr_denoiser,
+            "denoiser_saved_path": curr_denoiser_saved_path,
             "param": param,
             "denoise_image_func": denoiser._denoise_image_func,
             "best_eval_result":best_eval_result
@@ -203,7 +189,10 @@ class Denoiser:
     )
     
     for denoiserName, denoiserDict in best_denoisers.items():
-      best_denoiser = denoiserDict['denoiser']
+      if denoiserName in ALL_NN_DENOISER_NAMES:
+        best_denoiser = tf.keras.models.load_model(denoiserDict['denoiser_saved_path'])
+      else:
+        best_denoiser = (denoiserDict['denoiser_saved_path'])
       curr_denoiser_params = denoiserDict['param']
       denoise_image_func = denoiserDict['denoise_image_func']
       bestDenoiserEvalReportPath = self.denoiserKwargs['bestDenoiserGivenAllNoiseLevels'] + "/best_{}_Denoiser_report.json".format(denoiserName)
@@ -228,8 +217,8 @@ class Denoiser:
 
         del best_denoiser
         gc.collect()
-        del denoiserDict['denoiser']
-        gc.collect()
+        # del denoiserDict['denoiser']
+        # gc.collect()
         
         with open(bestDenoiserEvalReportPath, 'w') as fp:
           json.dump(evalResults, fp,  indent = 4)
@@ -313,8 +302,28 @@ class Denoiser:
         y_true_for_adv = y_true_for_adv,
         evaluateDenoiserFunc = evaluateDenoiser
       )
+    elif name == "Chained_EAE_Vae":
+      return Chained_EAE_Vae(
+        img_size = self.kwargs['img_size'],
+        savedDenoiserPath = savedDenoiserPath,
+        resolution = self.denoiserKwargs['resolution'],
+        dataset_name=self.dataset_name,
+        all_eval_paths = all_eval_paths,
+        y_true_for_benign = y_true_for_benign,
+        y_true_for_adv = y_true_for_adv
+      )
+    elif name == "Chained_Vae_EAE":
+      return Chained_Vae_EAE(
+        img_size = self.kwargs['img_size'],
+        savedDenoiserPath = savedDenoiserPath,
+        resolution = self.denoiserKwargs['resolution'],
+        dataset_name=self.dataset_name,
+        all_eval_paths = all_eval_paths,
+        y_true_for_benign = y_true_for_benign,
+        y_true_for_adv = y_true_for_adv
+      )
     else:
-      return None
+      raise Exception("{} is not supported in Denoisers.py".format(name))
 
 def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_for_adv, denoise_image_func, 
   curr_denoiser, curr_denoiser_name, curr_denoiser_params,
@@ -352,8 +361,9 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
       adv_y_preds = np.array([])
       denoised_y_preds =  np.array([])
 
-      for _, benign_img in current_ds_test:
+      for _, benign_img_original in current_ds_test:
         # no denoiser, benign examples
+        benign_img = np.copy(benign_img_original.numpy())
         start_target_predict= datetime.datetime.now()
         benign_y_pred = targetModel.predict(benign_img * 255)
         end_target_predict= datetime.datetime.now()
@@ -405,8 +415,8 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
       gc.collect()
       adv_acc = 100 * accuracy_score(y_true_for_adv, adv_y_preds)
       adv_precision, adv_recall, adv_f1_score, _ = precision_recall_fscore_support(y_true_for_adv, adv_y_preds, average = averageMode)
-      print("[adv] adv_acc: {}, denoised_adv_acc: {}".format(adv_acc, denoised_adv_acc))
-      print("denoisers took {} seconds".format((totalDenoisedTotalElapsed / y_true_for_adv.shape[0]) * 1000))
+      # print("[adv] adv_acc: {}, denoised_adv_acc: {}".format(adv_acc, denoised_adv_acc))
+      # print("denoisers took {} seconds".format((totalDenoisedTotalElapsed / y_true_for_adv.shape[0]) * 1000))
       
       if key not in results:
         results[key] = {
@@ -415,7 +425,7 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
           "natural_precision": benign_precision * 100,
           "natural_recall": benign_recall * 100,
           "natural_f1-score": benign_f1_score * 100,
-          "inference_elapsed_time_per_1000_in_s": (totalTargetPredict / y_true_for_adv.shape[0]) * 1000
+          # "inference_elapsed_time_per_1000_in_s": (totalTargetPredict / y_true_for_adv.shape[0]) * 1000
           }
         }
       if 'grey-box_setting' not in results[key]:
@@ -436,7 +446,7 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
       
       results[key]['grey-box_setting'][attackerName]['defenders'].append(
         {
-          "nameOfDefenders": curr_denoiser_name,
+          "nameOfDefender": curr_denoiser_name,
           "type": "PREPROCESSOR",
           "defense_params": curr_denoiser_params,
           "defender_performance":{
@@ -449,12 +459,12 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
             "robust_precision": denoised_adv_precision * 100,
             "robust_recall": denoised_adv_recall  * 100,
             "robust_f1-score": denoised_adv_f1_score  * 100,
-            "inference_elapsed_time_per_1000_in_s": (totalDenoisedTotalElapsed / y_true_for_adv.shape[0]) * 1000
+            # "inference_elapsed_time_per_1000_in_s": (totalDenoisedTotalElapsed / y_true_for_adv.shape[0]) * 1000
           }
         }
       )
 
-      total_individual_denoiser_score += (denoised_benign_acc + denoised_adv_acc) # equal weight
+      total_individual_denoiser_score += (denoised_benign_f1_score + denoised_adv_f1_score) * 100 # equal weight
       # print(json.dumps(results, indent=4))
       count += 1
       print("\n{} / {}".format(count, total))
@@ -478,37 +488,38 @@ def train(ds_train, ds_test, resolution, modelsPipeline, dataset_name, all_eval_
     total = len(modelsPipeline)
     count = 0
     best_denoiser_avg_eval_score = 0
-    best_denoiser = None
+    # best_denoiser = None
     best_eval_result, bestParam, bestModelSavedPath= {}, {}, ""
     for modelDict in modelsPipeline:
       denoiser_name = modelDict['denoiser_name']
-      denoiser = modelDict['model']
+      # denoiser = modelDict['model']
       param = modelDict['param']
       save_path = modelDict['save_path']
       evaluationReportPath = modelDict['evaluationReportPath']
       if len(os.listdir(save_path)) == 0:
         print("[DEBUG] working on {}".format(save_path))
-        denoiser, timeTaken = fittingFunc(
+        denoiser, timeTaken, history = fittingFunc(
           ds_train = ds_train,
           ds_test = ds_test,
-          denoiser = denoiser
+          denoiser = modelDict['model']
         )
         
         denoiser.save(save_path)
+        print("[DEBUG] saved to {}".format(save_path))
         history_save_path = save_path + "/history.npz"
         print("[DEBUG] saving to {}".format(history_save_path))
         
-        np.savez_compressed(history_save_path, trainingTimeInSeconds = timeTaken)
+        np.savez_compressed(history_save_path, trainingTimeInSeconds = timeTaken, history = history.history)
       else:
         print("{} exits !".format(save_path))
-        denoiser = tf.keras.models.load_model(save_path)
-        print("[DEBUG] successfully loaded the denoiser")
       count += 1
       print("{} / {}".format(count, total))
 
       # <refactor this block
       current_denoiser_avg_eval_score = None
       if not os.path.exists(evaluationReportPath):
+        denoiser = tf.keras.models.load_model(save_path)
+        print("working on {}".format(evaluationReportPath))
         evalResults, current_denoiser_avg_eval_score = evaluateDenoiser(
           curr_denoiser = denoiser,
           curr_denoiser_name = denoiser_name, 
@@ -539,8 +550,9 @@ def train(ds_train, ds_test, resolution, modelsPipeline, dataset_name, all_eval_
         bestModelSavedPath = save_path
         # del best_denoiser
         # gc.collect()
-        best_denoiser = denoiser
-        print("best_denoiser_avg_eval_score thus far: {}".format(best_denoiser_avg_eval_score))
+        # best_denoiser = denoiser
+        print("best_denoiser_avg_eval_score thus far: {}, bestModelSavedPath thus far: {}".format(best_denoiser_avg_eval_score, bestModelSavedPath))
+
       # else:
       #   del denoiser
       #   gc.collect()
@@ -551,7 +563,8 @@ def train(ds_train, ds_test, resolution, modelsPipeline, dataset_name, all_eval_
     best_eval_result['param'] = bestParam
     best_eval_result['bestModelSavedPath'] = bestModelSavedPath
     current_denoiser_eval_score_given_noiseLevel = best_denoiser_avg_eval_score
-    return current_denoiser_eval_score_given_noiseLevel, best_eval_result, best_denoiser
+    # best_denoiser = tf.keras.models.load_model(bestModelSavedPath)
+    return current_denoiser_eval_score_given_noiseLevel, best_eval_result, bestModelSavedPath
 
 class Vae:
   # source: https://github.com/Roy-YL/VAE-Adversarial-Defense/blob/master/MNIST_CIFAR10/train_vae.py
@@ -569,8 +582,9 @@ class Vae:
     self.bestDenoiserPath = None
   
   def _denoise_image_func(self, img, curr_denoiser):
-    img = tf.image.resize(img, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")
-    return tf.image.resize(curr_denoiser.predict(img), (self.img_size, self.img_size), method = "bilinear") * 255
+    return curr_denoiser.predict(img) * 255
+    # img = tf.image.resize(img, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")             # working
+    # return tf.image.resize(curr_denoiser.predict(img), (self.img_size, self.img_size), method = "bilinear") * 255   # working
 
   def _build_model(self, latent_dim):
     def sampling(args):
@@ -581,7 +595,8 @@ class Vae:
       epsilon = K.random_normal(shape=(batch, dim))
       return z_mean + K.exp(0.5 * z_log_sigma) * epsilon
     
-    inputs = Input(shape=(VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE, 3))
+    # inputs = Input(shape=(VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE, 3)) # working
+    inputs = Input(shape=(self.img_size, self.img_size, 3))
     latent_dim = latent_dim
 
     x = Conv2D(64, (3, 3), activation='relu', padding='same')(inputs)
@@ -618,7 +633,7 @@ class Vae:
     vae = Model(inputs, outputs, name='VAE')
 
     reconstruction_loss = mean_squared_error(K.flatten(inputs), K.flatten(outputs))
-    reconstruction_loss *= (32 * 32 * 3)
+    reconstruction_loss *= (self.img_size * self.img_size * 3)
     kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
     kl_loss = K.sum(kl_loss, axis=-1)
     kl_loss *= -0.5
@@ -671,20 +686,22 @@ class Vae:
     return modelsPipeline # containing {"model":model, "param":param} for each item
 
   def _fittingFunc(self, ds_train, ds_test, denoiser):
-    ds_train = ds_train.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
-    ds_test = ds_test.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
+    # working
+    # ds_train = ds_train.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
+    # ds_test = ds_test.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
+    
     start = time.time()
     history = denoiser.fit(
         ds_train,
         epochs = VAE_REGULAR_TRAINING_EPOCHS,
-        batch_size = 1,
+        batch_size = 10,
         shuffle = True,
         validation_data = (ds_test),
         verbose = 1
     )
     end = time.time()
     timeTaken = (end - start)
-    return denoiser, timeTaken
+    return denoiser, timeTaken, history
 
   def train(self, ds_train = None, ds_test = None, resolution = [None, None, None]):
     return train(
@@ -928,7 +945,7 @@ class Unet:
     )
     end = time.time()
     timeTaken = (end - start)
-    return denoiser, timeTaken
+    return denoiser, timeTaken, history
   
   def _denoise_image_func(self, img, curr_denoiser):
     return curr_denoiser.predict(img) * 255 # un-normalizing
@@ -1064,7 +1081,7 @@ class AutoEncoder:
     )
     end = time.time()
     timeTaken = (end - start)
-    return denoiser, timeTaken
+    return denoiser, timeTaken, history
 
   def _denoise_image_func(self, img, curr_denoiser):
     return curr_denoiser.predict(img) * 255 # un-normalizing
@@ -1082,7 +1099,309 @@ class AutoEncoder:
       fittingFunc = self._fittingFunc,
       denoise_image_func = self._denoise_image_func
     )
-      
-      
-      
 
+class Chained_EAE_Vae:
+  # source: https://github.com/Roy-YL/VAE-Adversarial-Defense/blob/master/MNIST_CIFAR10/train_vae.py
+  # paper: https://arxiv.org/pdf/1812.02891.pdf
+  def __init__(self, img_size, savedDenoiserPath = "", dataset_name = "", resolution = [None, None, None], all_eval_paths = [],
+  y_true_for_benign = None, y_true_for_adv = None, e_ae_if_size = 28):
+    self.e_ae_if_size = e_ae_if_size
+    self.img_size = img_size
+    self.resolution = resolution
+    self.savedDenoiserPath = savedDenoiserPath
+    self.dataset_name = dataset_name
+    self.all_eval_paths = all_eval_paths
+    self.y_true_for_benign = y_true_for_benign
+    self.y_true_for_adv = y_true_for_adv
+    self.modelsPipeline = self._buildAllmodels()
+    self.bestDenoiserPath = None
+  
+  def _denoise_image_func(self, img, curr_denoiser):
+    denoised_x = (tf.image.resize(tf.image.resize(img, (self.e_ae_if_size, self.e_ae_if_size), method = "bilinear"), (self.resolution[0], self.resolution[1]), method = "bilinear"))
+    return curr_denoiser.predict(denoised_x) * 255
+
+    # denoised_x = curr_denoiser.predict(img) * 255
+    # return (tf.image.resize(tf.image.resize(denoised_x, (28, 28), method = "bilinear"), (self.resolution[0], self.resolution[1]), method = "bilinear"))
+
+  def _build_model(self, latent_dim):
+    def sampling(args):
+      z_mean, z_log_sigma = args
+      batch = K.shape(z_mean)[0]
+      dim = K.int_shape(z_mean)[1]
+      # by default, random_normal has mean=0 and std=1.0
+      epsilon = K.random_normal(shape=(batch, dim))
+      return z_mean + K.exp(0.5 * z_log_sigma) * epsilon
+    
+    # inputs = Input(shape=(VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE, 3)) # working
+    inputs = Input(shape=(self.img_size, self.img_size, 3))
+    latent_dim = latent_dim
+
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(inputs)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+
+    conv_shape = x.get_shape().as_list()[1:]
+    conv_dim = int(conv_shape[0]) * int(conv_shape[1]) * int(conv_shape[2])
+
+    # print(conv_shape, conv_dim)
+
+    x = Flatten()(x)
+    z_mean = Dense(latent_dim)(x)
+    z_log_sigma = Dense(latent_dim)(x)
+
+    z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_sigma])
+    encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
+    # print(encoder.summary())
+
+    latent_inputs = Input(shape=(latent_dim,))
+    x = Dense(conv_dim)(latent_inputs)
+    x = Reshape(conv_shape)(x)
+
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
+
+    decoder = Model(latent_inputs, decoded, name='decoder')
+    # print(decoder.summary())
+    outputs = decoder(encoder(inputs)[2])
+    vae = Model(inputs, outputs, name='VAE')
+
+    reconstruction_loss = mean_squared_error(K.flatten(inputs), K.flatten(outputs))
+    reconstruction_loss *= (self.img_size * self.img_size * 3)
+    kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
+    kl_loss = K.sum(kl_loss, axis=-1)
+    kl_loss *= -0.5
+
+    vae_loss = K.mean(reconstruction_loss + kl_loss * 0.01)
+    vae.add_loss(vae_loss)
+
+    return vae
+  
+  def _buildModelGivenParam(self, param = None):
+    vae = self._build_model(
+      latent_dim = param['latent_dim']
+    )
+    #Initializing and compiling model
+    if param['optimizerLR'] == 'default':
+      vae.compile(optimizer=param['optimizer'])
+    else:
+      optimizer = None
+      if param['optimizer'] == 'adam':
+        optimizer = Adam(learning_rate=param['optimizerLR'])
+      vae.compile(optimizer=optimizer)
+    return vae
+
+  def _buildAllmodels(self):
+    modelsPipeline = []
+    params = ParamsRangeForNNDenoisers(name = "vae", resolution=self.resolution).getParams()
+    for param in params:
+      # complete save path
+      modelPath = substituteString(
+        my_dict={
+          "latent_dim": param['latent_dim'],
+          "optimizer": param['optimizer'],
+          "optimizerLR": param['optimizerLR']
+        },
+        formatStr = "latent_dim-{latent_dim}_optimizer-{optimizer}_optimizerLR-{optimizerLR}" 
+      )
+      save_path = self.savedDenoiserPath + "/" + modelPath
+      Path(save_path).mkdir(parents=True, exist_ok=True)
+      evaluationReportPath = save_path + "/denoisingEval.json"
+      self.bestDenoiserPath = self.savedDenoiserPath + "/bestDenoiser.json"
+      
+      modelDict = {
+        "denoiser_name": "vae",
+        "model": self._buildModelGivenParam(param = param),
+        "param": param,
+        "save_path": save_path,
+        "evaluationReportPath": evaluationReportPath
+      }
+      modelsPipeline.append(modelDict)
+    return modelsPipeline # containing {"model":model, "param":param} for each item
+
+  def _fittingFunc(self, ds_train, ds_test, denoiser):
+    # working
+    # ds_train = ds_train.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
+    # ds_test = ds_test.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
+    
+    start = time.time()
+    history = denoiser.fit(
+        ds_train,
+        epochs = VAE_REGULAR_TRAINING_EPOCHS,
+        batch_size = 10,
+        shuffle = True,
+        validation_data = (ds_test),
+        verbose = 1
+    )
+    end = time.time()
+    timeTaken = (end - start)
+    return denoiser, timeTaken, history
+
+  def train(self, ds_train = None, ds_test = None, resolution = [None, None, None]):
+    return train(
+      ds_train = ds_train,
+      ds_test = ds_test,
+      resolution = resolution,
+      modelsPipeline = self.modelsPipeline,
+      dataset_name = self.dataset_name,
+      all_eval_paths = self.all_eval_paths,
+      y_true_for_benign = self.y_true_for_benign,
+      y_true_for_adv = self.y_true_for_adv,
+      fittingFunc = self._fittingFunc,
+      denoise_image_func = self._denoise_image_func
+    )
+
+class Chained_Vae_EAE:
+  # source: https://github.com/Roy-YL/VAE-Adversarial-Defense/blob/master/MNIST_CIFAR10/train_vae.py
+  # paper: https://arxiv.org/pdf/1812.02891.pdf
+  def __init__(self, img_size, savedDenoiserPath = "", dataset_name = "", resolution = [None, None, None], all_eval_paths = [],
+  y_true_for_benign = None, y_true_for_adv = None, e_ae_if_size = 28):
+    self.e_ae_if_size = e_ae_if_size
+    self.img_size = img_size
+    self.resolution = resolution
+    self.savedDenoiserPath = savedDenoiserPath
+    self.dataset_name = dataset_name
+    self.all_eval_paths = all_eval_paths
+    self.y_true_for_benign = y_true_for_benign
+    self.y_true_for_adv = y_true_for_adv
+    self.modelsPipeline = self._buildAllmodels()
+    self.bestDenoiserPath = None
+  
+  def _denoise_image_func(self, img, curr_denoiser):
+    denoised_x = curr_denoiser.predict(img)
+    final_denoised_x = (tf.image.resize(tf.image.resize(denoised_x, (self.e_ae_if_size, self.e_ae_if_size), method = "bilinear"), (self.resolution[0], self.resolution[1]), method = "bilinear"))
+    return final_denoised_x * 255
+
+  def _build_model(self, latent_dim):
+    def sampling(args):
+      z_mean, z_log_sigma = args
+      batch = K.shape(z_mean)[0]
+      dim = K.int_shape(z_mean)[1]
+      # by default, random_normal has mean=0 and std=1.0
+      epsilon = K.random_normal(shape=(batch, dim))
+      return z_mean + K.exp(0.5 * z_log_sigma) * epsilon
+    
+    # inputs = Input(shape=(VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE, 3)) # working
+    inputs = Input(shape=(self.img_size, self.img_size, 3))
+    latent_dim = latent_dim
+
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(inputs)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+
+    conv_shape = x.get_shape().as_list()[1:]
+    conv_dim = int(conv_shape[0]) * int(conv_shape[1]) * int(conv_shape[2])
+
+    # print(conv_shape, conv_dim)
+
+    x = Flatten()(x)
+    z_mean = Dense(latent_dim)(x)
+    z_log_sigma = Dense(latent_dim)(x)
+
+    z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_sigma])
+    encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
+    # print(encoder.summary())
+
+    latent_inputs = Input(shape=(latent_dim,))
+    x = Dense(conv_dim)(latent_inputs)
+    x = Reshape(conv_shape)(x)
+
+    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2, 2))(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+    decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
+
+    decoder = Model(latent_inputs, decoded, name='decoder')
+    # print(decoder.summary())
+    outputs = decoder(encoder(inputs)[2])
+    vae = Model(inputs, outputs, name='VAE')
+
+    reconstruction_loss = mean_squared_error(K.flatten(inputs), K.flatten(outputs))
+    reconstruction_loss *= (self.img_size * self.img_size * 3)
+    kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
+    kl_loss = K.sum(kl_loss, axis=-1)
+    kl_loss *= -0.5
+
+    vae_loss = K.mean(reconstruction_loss + kl_loss * 0.01)
+    vae.add_loss(vae_loss)
+
+    return vae
+  
+  def _buildModelGivenParam(self, param = None):
+    vae = self._build_model(
+      latent_dim = param['latent_dim']
+    )
+    #Initializing and compiling model
+    if param['optimizerLR'] == 'default':
+      vae.compile(optimizer=param['optimizer'])
+    else:
+      optimizer = None
+      if param['optimizer'] == 'adam':
+        optimizer = Adam(learning_rate=param['optimizerLR'])
+      vae.compile(optimizer=optimizer)
+    return vae
+
+  def _buildAllmodels(self):
+    modelsPipeline = []
+    params = ParamsRangeForNNDenoisers(name = "vae", resolution=self.resolution).getParams()
+    for param in params:
+      # complete save path
+      modelPath = substituteString(
+        my_dict={
+          "latent_dim": param['latent_dim'],
+          "optimizer": param['optimizer'],
+          "optimizerLR": param['optimizerLR']
+        },
+        formatStr = "latent_dim-{latent_dim}_optimizer-{optimizer}_optimizerLR-{optimizerLR}" 
+      )
+      save_path = self.savedDenoiserPath + "/" + modelPath
+      Path(save_path).mkdir(parents=True, exist_ok=True)
+      evaluationReportPath = save_path + "/denoisingEval.json"
+      self.bestDenoiserPath = self.savedDenoiserPath + "/bestDenoiser.json"
+      
+      modelDict = {
+        "denoiser_name": "vae",
+        "model": self._buildModelGivenParam(param = param),
+        "param": param,
+        "save_path": save_path,
+        "evaluationReportPath": evaluationReportPath
+      }
+      modelsPipeline.append(modelDict)
+    return modelsPipeline # containing {"model":model, "param":param} for each item
+
+  def _fittingFunc(self, ds_train, ds_test, denoiser):
+    # working
+    # ds_train = ds_train.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
+    # ds_test = ds_test.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
+    
+    start = time.time()
+    history = denoiser.fit(
+        ds_train,
+        epochs = VAE_REGULAR_TRAINING_EPOCHS,
+        batch_size = 10,
+        shuffle = True,
+        validation_data = (ds_test),
+        verbose = 1
+    )
+    end = time.time()
+    timeTaken = (end - start)
+    return denoiser, timeTaken, history
+
+  def train(self, ds_train = None, ds_test = None, resolution = [None, None, None]):
+    return train(
+      ds_train = ds_train,
+      ds_test = ds_test,
+      resolution = resolution,
+      modelsPipeline = self.modelsPipeline,
+      dataset_name = self.dataset_name,
+      all_eval_paths = self.all_eval_paths,
+      y_true_for_benign = self.y_true_for_benign,
+      y_true_for_adv = self.y_true_for_adv,
+      fittingFunc = self._fittingFunc,
+      denoise_image_func = self._denoise_image_func
+    )
