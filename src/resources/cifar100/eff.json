@@ -1,0 +1,178 @@
+{
+  "mode": "Train-AttackBase-Denoise",
+  "gpu": "0",
+  "img_size": 224,
+  "parentPath": "data_224_224",
+  "train": {
+    "trainingSet": "cifar100",
+    "namesOfModels": ["EfficientNetB0"],
+    "freezeEpochs": 5,
+    "unfreezeEpochs": 30,
+    "trainingVerbose": true,
+    "numberOfModels": [0,1,2,3,4],
+    "savedModelPath":"data_224_224/cifar100/cifar100_models",
+    "bestParamsJSONPath":"data_224_224/cifar100/best_params",
+    "kFold_n_splits": 5
+  },
+  "attack":{
+    "preprocessors":[
+      {
+        "name": "NO_PREPROCESSOR",
+        "preprocessor_pipeline": [],
+        "pathToCreate":"data_224_224/cifar100/attacks/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}"
+      },
+      {
+        "name": "Emulated Autoencoder",
+        "preprocessor_pipeline": ["E-AE"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/EAE_is-28_resizeMethod-bilinear/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "params":{
+          "intermediary_size": 28,
+          "resizeMethod": "bilinear",
+          "resolution": [224, 224, 3]
+        }
+      },
+      {
+        "name": "jpegCompression",
+        "preprocessor_pipeline": ["jpegCompression"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/JPEG_quality-23/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "params":{
+          "jpeg":{"quality":23}
+        }
+      },
+      {
+        "name": "EAE-JPEG",
+        "preprocessor_pipeline": ["EAE_jpegCompression"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/EAE_is-28_resizeMethod-bilinear_THEN_JPEG_quality-23/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "params":{
+          "jpeg":{
+            "quality":23
+          },
+          "intermediary_size": 28,
+          "resizeMethod": "bilinear",
+          "resolution": [224, 224, 3]
+        }
+      },
+      {
+        "name": "JPEG-EAE",
+        "preprocessor_pipeline": ["JpegCompression_EAE"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/JPEG_quality-23_THEN_EAE_is-28_resizeMethod-bilinear/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "params":{
+          "jpeg":{"quality":23},
+          "intermediary_size": 28,
+          "resizeMethod": "bilinear",
+          "resolution": [224, 224, 3]
+        }
+      },
+      {
+        "name": "UNET",
+        "preprocessor_pipeline": ["UNET"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/UNET_start_neurons-28_optimizer-adam_loss_func-MSE_dropout_rate-0.5/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "params":{
+          "savedDenoiserPath":"data_224_224/denoisers/cifar100/noiseLevel_{noiseLevel}/{denoiserName}",
+          "dropout_rate": 0.5,
+          "loss_func": "MSE",
+          "optimizer": "adam",
+          "start_neurons": 28,
+          "noiseLevel": 1e-3
+        }
+      },
+      {
+        "name": "Autoencoder",
+        "preprocessor_pipeline": ["AE"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/AE_numOfFilters-128_optimizer-adam_loss_func-mse_optimizerLR-1e-05_dropout_rate-0.25/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "params":{
+          "savedDenoiserPath":"data_224_224/denoisers/cifar100/noiseLevel_{noiseLevel}/{denoiserName}",
+          "dropout_rate": 0.25,
+          "loss_func": "mse",
+          "numOfFilters": 128,
+          "optimizer": "adam",
+          "optimizerLR": 1e-05,
+          "noiseLevel": 1e-3
+        }
+      },
+      {
+        "name": "EAE_VAE",
+        "preprocessor_pipeline": ["EAE_VAE"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/EAE_VAE/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "advExamplesDSPath":"{pathToCreate}/{dsSavedFilePath}",
+        "params":{
+          "savedDenoiserPath":"data_224_224/denoisers/cifar100/noiseLevel_{noiseLevel}/{denoiserName}",
+          "latent_dim": 1024,
+          "optimizer": "adam",
+          "optimizerLR": 1e-05,
+          "noiseLevel": 0.03,
+          "intermediary_size": 28,
+          "resizeMethod": "bilinear",
+          "resolution": [224, 224, 3]
+        }
+      },
+      {
+        "name": "VAE_EAE",
+        "preprocessor_pipeline": ["VAE_EAE"],
+        "pathToCreate":"data_224_224/cifar100/attacks_withPreprocessor/VAE_EAE/{nameOfModel}/model_{numberOfModel}",
+        "advPredPath":"{pathToCreate}/{savedFilePath}",
+        "advExamplesNoiseDSPath":"{pathToCreate}/{noiseDsSavedFilePath}",
+        "advExamplesDSPath":"{pathToCreate}/{dsSavedFilePath}",
+        "params":{
+          "savedDenoiserPath":"data_224_224/denoisers/cifar100/noiseLevel_{noiseLevel}/{denoiserName}",
+          "latent_dim": 1024,
+          "optimizer": "adam",
+          "optimizerLR": 1e-05,
+          "noiseLevel": 0.03,
+          "intermediary_size": 28,
+          "resizeMethod": "bilinear",
+          "resolution": [224, 224, 3]
+        }
+      }
+    ],
+
+    "averageMode":"macro",
+    "numberOfAdvExamples":10000,
+    "attackers": [
+      {
+        "attackerName": "PGD",
+        "params":{
+          "batch_size": 20,
+          "max_iter": 150,
+          "eps": 0.85,
+          "num_random_init": 3
+        },
+        "savedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3).npz",
+        "dsSavedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3)_ds",
+        "noiseDsSavedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3)_noise_ds"
+      }
+    ]
+  },
+  "denoisers":{
+    "resolution": [224, 224, 3],
+    "numberOfTargetModels": [0],
+    "denoiserNames":["emulated-ae"],
+    "noiseLevels":[3e-2, 0, 1e-3],
+    "mode": "individual",
+    "savedDenoiserPath":"data_224_224/denoisers/cifar100/noiseLevel_{noiseLevel}/{denoiserName}",
+    "bestDenoiserGivenAllNoiseLevels":"data_224_224/denoisers/cifar100",
+    "e-ae":{
+      "EAE_intermediary_sizes":[32, 28, 30, 40, 64, 16],
+      "evaluationReportPath":"data_224_224/denoisers/cifar100/emulated-ae"
+    }
+  },
+  "result": {
+    "savedJSONPath": "data_224_224/cifar100/classifierBaseLineReports/report.json"
+  }
+}
