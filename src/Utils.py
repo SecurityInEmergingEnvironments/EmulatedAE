@@ -9,11 +9,4 @@ def generateSamples(data, path):
         ax = plt.subplot(4, 4, i + 1)
         plt.imshow(data[i].astype("uint8"))
     plt.savefig(path)
-
-def loggingDictionary(myDictionary:dict = {}, context = None):
-  if context is not None:
-    print(context)
-  for key, value in myDictionary.items():
-    print(str(key) + " is " + str(value))
-  print('\n')
   
