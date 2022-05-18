@@ -22,7 +22,6 @@ logging.config.dictConfig({
 })
 from DataLoader import DataLoader
 from Utils import substituteString, generateSamples
-from ReportGenerator import ClassifierBaseAttackReport
 from Constants import BATCH_SIZE, TMP_NAME
 from ParamsRange import ParamsRangeRetriever
 

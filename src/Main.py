@@ -5,13 +5,11 @@ from Denoiser import Denoiser
 
 import os
 import tensorflow as tf
-# status: building and testing Attacker
 def main(argv):
   inputConfigFile = argv[0]
   configParser = ConfigParser()
   data = configParser.parse(inputConfigFile)
   os.environ["CUDA_VISIBLE_DEVICES"] = data['gpu']
-  # suppress warning when loading model
   tf.get_logger().setLevel('ERROR')
   if 'Train' in data['mode']:
     from Trainer import ClassifierTrainer
