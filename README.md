@@ -1,2 +1,2 @@
 # Emulated Autoencoder
-This is a readme file
+This framework helps evaluate image denoisers as adversarial defense.
