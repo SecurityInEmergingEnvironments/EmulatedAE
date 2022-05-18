@@ -154,6 +154,29 @@
         "savedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3).npz",
         "dsSavedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3)_ds",
         "noiseDsSavedFilePath":"(PGD)_(max_iter-150_eps-85e-2_num_random_init-3)_noise_ds"
+      },
+      {
+        "attackerName": "FGSM",
+        "params":{
+          "batch_size": 20,
+          "eps": 0.9,
+          "num_random_init": 3,
+          "minimal": true
+        },
+        "savedFilePath":"(FGSM)_(eps-9e-1_num_random_init-3_minimal-true).npz",
+        "dsSavedFilePath":"(FGSM)_(eps-9e-1_num_random_init-3_minimal-true)_ds",
+        "noiseDsSavedFilePath":"(FGSM)_(eps-9e-1_num_random_init-3_minimal-true)_noise_ds"
+      },
+      {
+        "attackerName": "deepFool",
+        "params":{
+          "batch_size": 10,
+          "max_iter": 50,
+          "epsilon": 1e-2
+        },
+        "savedFilePath":"(deepFool)_(max_iter-50_epsilon-1e-2).npz",
+        "dsSavedFilePath":"(deepFool)_(max_iter-50_epsilon-1e-2)_ds",
+        "noiseDsSavedFilePath":"(deepFool)_(max_iter-50_epsilon-1e-2)_noise_ds"
       }
     ]
   },
