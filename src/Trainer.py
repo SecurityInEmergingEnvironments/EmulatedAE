@@ -71,8 +71,6 @@ class ClassifierTrainer:
     best_estimator_history = None
 
     # load an untrained model
-    # modelLoader = ModelLoader(classes)
-    
     # get cross-validation indices. Read more about cross-validation here: https://scikit-learn.org/stable/modules/cross_validation.html
     kFoldIndicesGenerator = KFoldIndicesGenerator()
     all_indices = kFoldIndicesGenerator.generateIndices(self.__kwargsTrain['kFold_n_splits'])
@@ -188,8 +186,6 @@ class ClassifierTrainer:
         print(bestParamsForGivenModelFilePath + " does not exist !!")
         for params in paramsList:
           print("bestParams thus far: {}".format(bestParams))
-          print("current param: "+str(params))
-          # modelLoader = ModelLoader(classes)
           kFoldIndicesGenerator = KFoldIndicesGenerator()
           all_indices = kFoldIndicesGenerator.generateIndices(self.__kwargsTrain['kFold_n_splits'])
 
