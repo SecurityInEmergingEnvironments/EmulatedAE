@@ -166,7 +166,6 @@ class TraditionalImageDenoiser:
     self.evaluateDenoiserFunc = evaluateDenoiserFunc
 
   def train (self, ds_train, ds_test, resolution):
-    # TODO: rename all "train" func to "trainAndEval"
     count = 0
     best_denoiser_avg_eval_score = 0
     best_denoiser = None
@@ -191,7 +190,6 @@ class TraditionalImageDenoiser:
           best_eval_result = evalResults
           bestIntermediarySize = intermediary_size
           best_denoiser = denoiser
-          # best_denoiser = (lambda img : (tf.image.resize(tf.image.resize(img * 255, (bestIntermediarySize,bestIntermediarySize), method = "bilinear"), (resolution[0],resolution[1]), method = "bilinear")))
           print("bestIntermediarySize thus far: {}, best_denoiser_avg_eval_score thus far: {}".format(bestIntermediarySize, best_denoiser_avg_eval_score))
         count += 1
         print("[TraditionalImageDenoiser] {} / {} Done".format(count, total))
@@ -305,13 +303,12 @@ class TraditionalImageDenoiser:
       print("[TraditionalImageDenoiser] working on {}".format(evaluationReportPath))
       evalResults, current_denoiser_avg_eval_score = self.evaluateDenoiserFunc(
         curr_denoiser = denoiser,
-        curr_denoiser_name = self.name, # "emulated-ae",
+        curr_denoiser_name = self.name,
         curr_denoiser_params = denoiserParams,
         current_ds_test = ds_test,
         all_eval_paths = self.all_eval_paths,
         y_true_for_benign = self.y_true_for_benign,
         y_true_for_adv = self.y_true_for_adv,
-        # denoise_image_func = self._denoise_image_func
         denoise_image_func = _denoise_image_func
       )
       print("current_denoiser_avg_eval_score: {}".format(current_denoiser_avg_eval_score))

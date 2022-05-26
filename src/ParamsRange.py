@@ -11,7 +11,6 @@ class ParamsRangeRetriever:
       "layersToUnfreeze": [0, -20],
       "pooling" : ["max", "avg"],
       "top_dropout_rate" : [0.2, 0.3],
-      # "optimizer_learning_rate": ([1e-2] if self.nameOfDataset == "cifar100" else [1e-3])
       "optimizer_learning_rate": ([1e-2] if self.nameOfDataset == "cifar100" else [1e-3])
     }
 

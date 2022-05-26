@@ -37,7 +37,6 @@ class Denoiser:
     self.listOfDenoiserNames = self._getDenoiserNames(self.denoiserKwargs['denoiserNames'], self.denoiserKwargs['mode'])
     self.dataset_name = kwargs['train']['trainingSet']
     self.rawSavedDenoiserPath = self.denoiserKwargs['savedDenoiserPath']
-    # self.rawSavedDenoisedAdvPath = self.denoiserKwargs['savedDenoisedAdvPath']
     self.y_true_raw = None
 
   def _getAdvPredSavedPathAndAdvExamplesNoiseDSPath(self, my_dict, preprocessorObj):
@@ -98,7 +97,6 @@ class Denoiser:
             targetModel = tf.keras.models.load_model(targetModelFilePath)
 
           all_paths.append({
-            # "advPredPath": advPredPath,
             "nameOfModel":nameOfModel,
             "numOfModel": numOfModel,
 
@@ -181,7 +179,6 @@ class Denoiser:
       gc.collect()
     del all_eval_paths_for_picking_best_version
     gc.collect()
-    # print("best_denoisers: {}".format(best_denoisers))
     all_eval_paths_for_evaluate_best_version = self._getTargetPaths(
       numberOfTargetModels = self.kwargs['train']['numberOfModels'],
       ds_test = ds_test,
@@ -217,19 +214,15 @@ class Denoiser:
 
         del best_denoiser
         gc.collect()
-        # del denoiserDict['denoiser']
-        # gc.collect()
         
         with open(bestDenoiserEvalReportPath, 'w') as fp:
           json.dump(evalResults, fp,  indent = 4)
         print("[SUCCESS] saved to {}".format(bestDenoiserEvalReportPath))
-        # print(json.dumps(evalResults, indent=4))
       else:
         print("{} exists !".format(bestDenoiserEvalReportPath))
         with open(bestDenoiserEvalReportPath, 'r') as fp:
           saved_eval_result_best_denoiser = json.load(fp)
           print(saved_eval_result_best_denoiser)
-    # """
 
   def _getDenoiserNames(self, names = [], mode = None):
     result = []
@@ -289,7 +282,6 @@ class Denoiser:
         y_true_for_benign = y_true_for_benign,
         y_true_for_adv = y_true_for_adv
       )
-    # elif name == "emulated-ae":
     elif name in ALL_REGULAR_DENOISER_NAMES:
       print("[DEBUG] TraditionalImageDenoiser is {}".format(name))
       return TraditionalImageDenoiser(
@@ -334,8 +326,6 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
     total = len(all_eval_paths)
     count = 0
     for all_eval_paths_obj in all_eval_paths:
-      print("all_eval_paths_obj: {}".format(all_eval_paths_obj))
-      # advPredPath = all_eval_paths_obj['advPredPath']
       advExamplesNoiseDSPath = all_eval_paths_obj['advExamplesNoiseDSPath']
       targetModelFilePath = all_eval_paths_obj['targetModelFilePath']
       targetModel = all_eval_paths_obj['targetModel']
@@ -353,7 +343,6 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
       denoised_adv_y_preds =  np.array([])
       benign_y_preds =  np.array([])
       progress_bar_test = tf.keras.utils.Progbar(y_true_for_benign.shape[0]) 
-      #TODO: putting denoising benign and adv. examples into its own function
       noise_ds_adv = noise_ds_adv.batch(batch_size=BATCH_SIZE, drop_remainder=True)
       iterator = iter(noise_ds_adv)
       totalDenoisedTotalElapsed = 0
@@ -476,7 +465,7 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
       
     print("total_individual_denoiser_score: {}".format(total_individual_denoiser_score))
     print("total: {}".format(total))
-    return results, (total_individual_denoiser_score / total) # TODO: maybe there is a better way to rank them
+    return results, (total_individual_denoiser_score / total)
 
 def train(ds_train, ds_test, resolution, modelsPipeline, dataset_name, all_eval_paths, y_true_for_benign, y_true_for_adv,
   fittingFunc, denoise_image_func):
@@ -590,15 +579,12 @@ class Vae:
     conv_shape = x.get_shape().as_list()[1:]
     conv_dim = int(conv_shape[0]) * int(conv_shape[1]) * int(conv_shape[2])
 
-    # print(conv_shape, conv_dim)
-
     x = Flatten()(x)
     z_mean = Dense(latent_dim)(x)
     z_log_sigma = Dense(latent_dim)(x)
 
     z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_sigma])
     encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
-    # print(encoder.summary())
 
     latent_inputs = Input(shape=(latent_dim,))
     x = Dense(conv_dim)(latent_inputs)
@@ -611,7 +597,6 @@ class Vae:
     decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
 
     decoder = Model(latent_inputs, decoded, name='decoder')
-    # print(decoder.summary())
     outputs = decoder(encoder(inputs)[2])
     vae = Model(inputs, outputs, name='VAE')
 
@@ -670,9 +655,6 @@ class Vae:
 
   def _fittingFunc(self, ds_train, ds_test, denoiser):
     # working
-    # ds_train = ds_train.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
-    # ds_test = ds_test.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
-    
     start = time.time()
     history = denoiser.fit(
         ds_train,
@@ -745,7 +727,6 @@ class Vae:
                 test_denoised = np.concatenate((test_denoised, curr_test_images_denoised), axis = 0)
             progress_bar_test.add(curr_test_images.shape[0])
         
-        # TODO:refactoring
         rows = 4 # defining no. of rows in figure
         cols = 12 # defining no. of colums in figure
         cell_size = 1.5
@@ -1279,15 +1260,12 @@ class Chained_Vae_EAE:
     conv_shape = x.get_shape().as_list()[1:]
     conv_dim = int(conv_shape[0]) * int(conv_shape[1]) * int(conv_shape[2])
 
-    # print(conv_shape, conv_dim)
-
     x = Flatten()(x)
     z_mean = Dense(latent_dim)(x)
     z_log_sigma = Dense(latent_dim)(x)
 
     z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_sigma])
     encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
-    # print(encoder.summary())
 
     latent_inputs = Input(shape=(latent_dim,))
     x = Dense(conv_dim)(latent_inputs)
@@ -1300,7 +1278,6 @@ class Chained_Vae_EAE:
     decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
 
     decoder = Model(latent_inputs, decoded, name='decoder')
-    # print(decoder.summary())
     outputs = decoder(encoder(inputs)[2])
     vae = Model(inputs, outputs, name='VAE')
 
@@ -1358,10 +1335,6 @@ class Chained_Vae_EAE:
     return modelsPipeline # containing {"model":model, "param":param} for each item
 
   def _fittingFunc(self, ds_train, ds_test, denoiser):
-    # working
-    # ds_train = ds_train.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
-    # ds_test = ds_test.map(lambda noise, benign:(tf.image.resize(noise, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear"), tf.image.resize(benign, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")))
-    
     start = time.time()
     history = denoiser.fit(
         ds_train,

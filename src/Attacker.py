@@ -25,9 +25,8 @@ from Utils import substituteString, generateSamples
 from Constants import BATCH_SIZE, TMP_NAME
 from ParamsRange import ParamsRangeRetriever
 
-from PreprocessingDenoiser import EAE, AE, UNET, VAE, VAE_BPDA, EAE_VAE, VAE_EAE
+from PreprocessingDenoiser import EAE, AE, UNET, VAE, EAE_VAE, VAE_EAE
 from PreprocessingDenoiser import MyJpegCompression, EAE_jpegCompression, JpegCompression_EAE
-from PreprocessingDenoiser import EAE_jpegCompression_BPDA, VAE_EAE_BPDA
 
 """
 This componenet is to attack trained baseline classifiers
@@ -63,12 +62,6 @@ class Attacker:
         preprocessorPipeline.append(UNET(preprocessorObj['params']))
       elif preprocessorName == 'VAE':
         preprocessorPipeline.append(VAE(preprocessorObj['params']))
-      elif preprocessorName == 'VAE_BPDA':
-        preprocessorPipeline.append(VAE_BPDA(preprocessorObj['params']))
-      elif preprocessorName == 'EAE_jpegCompression_BPDA':
-        preprocessorPipeline.append(EAE_jpegCompression_BPDA(preprocessorObj['params']))
-      elif preprocessorName == 'VAE_EAE_BPDA':
-        preprocessorPipeline.append(VAE_EAE_BPDA(preprocessorObj['params']))
       elif preprocessorName == 'EAE_VAE':
         preprocessorPipeline.append(EAE_VAE(preprocessorObj['params']))
       elif preprocessorName == 'VAE_EAE':
