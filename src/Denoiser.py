@@ -415,8 +415,6 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
       gc.collect()
       adv_acc = 100 * accuracy_score(y_true_for_adv, adv_y_preds)
       adv_precision, adv_recall, adv_f1_score, _ = precision_recall_fscore_support(y_true_for_adv, adv_y_preds, average = averageMode)
-      # print("[adv] adv_acc: {}, denoised_adv_acc: {}".format(adv_acc, denoised_adv_acc))
-      # print("denoisers took {} seconds".format((totalDenoisedTotalElapsed / y_true_for_adv.shape[0]) * 1000))
       
       if key not in results:
         results[key] = {
@@ -425,7 +423,6 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
           "natural_precision": benign_precision * 100,
           "natural_recall": benign_recall * 100,
           "natural_f1-score": benign_f1_score * 100,
-          # "inference_elapsed_time_per_1000_in_s": (totalTargetPredict / y_true_for_adv.shape[0]) * 1000
           }
         }
       if 'grey-box_setting' not in results[key]:
@@ -459,13 +456,11 @@ def evaluateDenoiser(all_eval_paths, current_ds_test, y_true_for_benign, y_true_
             "robust_precision": denoised_adv_precision * 100,
             "robust_recall": denoised_adv_recall  * 100,
             "robust_f1-score": denoised_adv_f1_score  * 100,
-            # "inference_elapsed_time_per_1000_in_s": (totalDenoisedTotalElapsed / y_true_for_adv.shape[0]) * 1000
           }
         }
       )
 
       total_individual_denoiser_score += (denoised_benign_f1_score + denoised_adv_f1_score) * 100 # equal weight
-      # print(json.dumps(results, indent=4))
       count += 1
       print("\n{} / {}".format(count, total))
       del targetModel
@@ -488,11 +483,9 @@ def train(ds_train, ds_test, resolution, modelsPipeline, dataset_name, all_eval_
     total = len(modelsPipeline)
     count = 0
     best_denoiser_avg_eval_score = 0
-    # best_denoiser = None
     best_eval_result, bestParam, bestModelSavedPath= {}, {}, ""
     for modelDict in modelsPipeline:
       denoiser_name = modelDict['denoiser_name']
-      # denoiser = modelDict['model']
       param = modelDict['param']
       save_path = modelDict['save_path']
       evaluationReportPath = modelDict['evaluationReportPath']
@@ -548,22 +541,14 @@ def train(ds_train, ds_test, resolution, modelsPipeline, dataset_name, all_eval_
         best_eval_result = evalResults
         bestParam = param
         bestModelSavedPath = save_path
-        # del best_denoiser
-        # gc.collect()
-        # best_denoiser = denoiser
         print("best_denoiser_avg_eval_score thus far: {}, bestModelSavedPath thus far: {}".format(best_denoiser_avg_eval_score, bestModelSavedPath))
 
-      # else:
-      #   del denoiser
-      #   gc.collect()
       del modelDict['model']
-      # refactor this block>
     
     # save best param
     best_eval_result['param'] = bestParam
     best_eval_result['bestModelSavedPath'] = bestModelSavedPath
     current_denoiser_eval_score_given_noiseLevel = best_denoiser_avg_eval_score
-    # best_denoiser = tf.keras.models.load_model(bestModelSavedPath)
     return current_denoiser_eval_score_given_noiseLevel, best_eval_result, bestModelSavedPath
 
 class Vae:
@@ -583,8 +568,6 @@ class Vae:
   
   def _denoise_image_func(self, img, curr_denoiser):
     return curr_denoiser.predict(img) * 255
-    # img = tf.image.resize(img, (VAE_DEFAULT_INPUT_SHAPE, VAE_DEFAULT_INPUT_SHAPE), method = "bilinear")             # working
-    # return tf.image.resize(curr_denoiser.predict(img), (self.img_size, self.img_size), method = "bilinear") * 255   # working
 
   def _build_model(self, latent_dim):
     def sampling(args):
